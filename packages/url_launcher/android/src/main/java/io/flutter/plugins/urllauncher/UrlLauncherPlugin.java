@@ -12,8 +12,10 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.view.KeyEvent;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.CookieManager;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
@@ -83,24 +85,50 @@ public class UrlLauncherPlugin implements MethodCallHandler {
   public static class WebViewActivity extends Activity {
     private WebView webview;
 
+
+    // Save the state of the web view when the screen is rotated.
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        webview.saveState(outState);
+      }
     @Override
     public void onCreate(Bundle savedInstanceState) {
       super.onCreate(savedInstanceState);
+
       webview = new WebView(this);
       setContentView(webview);
+
       // Get the Intent that started this activity and extract the string
       Intent intent = getIntent();
       String url = intent.getStringExtra("url");
-      webview.loadUrl(url);
+
       // Open new urls inside the webview itself.
       webview.setWebViewClient(
           new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+
               view.loadUrl(request.getUrl().toString());
               return false;
             }
           });
+
+          // Reload the old WebView content
+      if (savedInstanceState != null) {
+        webview.restoreState(savedInstanceState);
+      }
+      // Create the WebView
+      else {
+        WebSettings ws = webview.getSettings();
+        ws.setPluginState(WebSettings.PluginState.ON);
+        ws.setJavaScriptEnabled(true);
+        // ws.setJavaScriptCanOpenWindowsAutomatically(true);
+        ws.setUseWideViewPort(true);
+        ws.setLoadWithOverviewMode(true);
+      }
+    webview.loadUrl(url);
+
     }
 
     @Override

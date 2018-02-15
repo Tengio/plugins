@@ -3,6 +3,7 @@
   <application>
     <activity android:name=".UrlLauncherPlugin$WebViewActivity"
       android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+      android:configChanges="orientation|screenSize"
       android:exported="false"/>
   </application>
 </manifest>
