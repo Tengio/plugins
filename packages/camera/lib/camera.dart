@@ -321,7 +321,7 @@ class CameraController extends ValueNotifier<CameraValue> {
     }
   }
 
-  Future<Null> videostop() async {
+  Future<String> videostop() async {
     if (!value.initialized || _disposed) {
       throw new CameraException(
         'Uninitialized video()',
@@ -330,11 +330,13 @@ class CameraController extends ValueNotifier<CameraValue> {
     }
     try {
       value = value.copyWith(videoOn: false);
-      await _channel.invokeMethod(
+      final String videofile = await _channel.invokeMethod(
         'videostop',
         <String, dynamic>{'textureId': _textureId },
       );
-       print('Video Stop pressed:' + value.toString());
+       print('Video Stop pressed:' + videofile);
+       return videofile;
+       //initialize();
      //return hello;
     } on PlatformException catch (e) {
       throw new CameraException(e.code, e.message);
