@@ -12,3 +12,5 @@ GeneratedPluginRegistrant.m
 
 GeneratedPluginRegistrant.java
 
+# Ignore gradle artifact.
+packages/camera/example/android/gradle/wrapper/gradle-wrapper.jar

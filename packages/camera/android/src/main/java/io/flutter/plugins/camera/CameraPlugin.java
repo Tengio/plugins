@@ -355,9 +355,9 @@ public class CameraPlugin implements MethodCallHandler {
 
                 // Video capture size should not be greater than 1080 because MediaRecorder cannot handle higher resolutions.
                 videoSize = goodEnough.get(0);
-                for (Size size : goodEnough) {
-                    if (size.getHeight() < 1080) {
-                        videoSize = size;
+                for (int i = goodEnough.size() - 1; i >= 0; i--) {
+                    if (goodEnough.get(i).getHeight() <= 1080) {
+                        videoSize = goodEnough.get(i);
                         break;
                     }
                 }
