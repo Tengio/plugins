@@ -4,19 +4,15 @@ import android.graphics.ImageFormat;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
-import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraMetadata;
 import android.hardware.camera2.CaptureFailure;
 import android.hardware.camera2.CaptureRequest;
-import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
 import android.media.MediaRecorder;
 import android.support.annotation.NonNull;
 import android.util.Log;
-import android.util.Size;
-import android.util.SparseIntArray;
 import android.view.Surface;
 
 import java.io.File;
@@ -24,8 +20,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,17 +29,12 @@ import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.PluginRegistry;
 import io.flutter.view.FlutterView;
 
+import static android.hardware.camera2.CameraDevice.TEMPLATE_STILL_CAPTURE;
+import static android.hardware.camera2.CaptureRequest.JPEG_ORIENTATION;
+
 final class MediaRecorderCamera implements Camera {
 
     private static final String TAG = "CameraPlugin";
-    private static final SparseIntArray ORIENTATIONS = new SparseIntArray() {
-        {
-            append(Surface.ROTATION_0, 0);
-            append(Surface.ROTATION_90, 90);
-            append(Surface.ROTATION_180, 180);
-            append(Surface.ROTATION_270, 270);
-        }
-    };
 
     private final FlutterView.SurfaceTextureEntry textureEntry;
     private final CameraServiceFacade cameraManagerService;
@@ -53,17 +42,13 @@ final class MediaRecorderCamera implements Camera {
     private CameraCaptureSession cameraCaptureSession;
     private EventChannel.EventSink eventSink;
     private ImageReader imageReader;
-    private int sensorOrientation;
-    private boolean isFaceFrontingCamera;
     private String cameraName;
-    private Size captureSize;
-    private Size previewSize;
     private CaptureRequest.Builder captureRequestBuilder;
-    private Size videoSize;
     private MediaRecorder mediaRecorder;
+    private CameraServiceFacade.CameraInformation cameraInformation;
     private boolean recordingVideo;
 
-    MediaRecorderCamera(final PluginRegistry.Registrar registrar,
+    @SuppressWarnings("ConstantConditions") MediaRecorderCamera(final PluginRegistry.Registrar registrar,
             final String cameraName,
             final String resolutionPreset,
             final MethodChannel.Result result) {
@@ -72,31 +57,7 @@ final class MediaRecorderCamera implements Camera {
         textureEntry = registrar.view().createSurfaceTexture();
         registerEventChannel(registrar);
         try {
-            Size minPreviewSize;
-            switch (resolutionPreset) {
-                case "high":
-                    minPreviewSize = new Size(1024, 768);
-                    break;
-                case "medium":
-                    minPreviewSize = new Size(640, 480);
-                    break;
-                case "low":
-                    minPreviewSize = new Size(320, 240);
-                    break;
-                default:
-                    throw new IllegalArgumentException("Unknown preset: " + resolutionPreset);
-            }
-            CameraCharacteristics characteristics = cameraManagerService.getCameraCharacteristics(cameraName);
-            StreamConfigurationMap streamConfigurationMap =
-                    characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-            //noinspection ConstantConditions
-            sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
-            //noinspection ConstantConditions
-            isFaceFrontingCamera =
-                    characteristics.get(CameraCharacteristics.LENS_FACING)
-                            == CameraMetadata.LENS_FACING_FRONT;
-            computeBestCaptureSize(streamConfigurationMap);
-            computeBestPreviewAndRecordingSize(streamConfigurationMap, minPreviewSize, captureSize);
+            cameraInformation = cameraManagerService.computeCameraInformation(cameraName, resolutionPreset);
         } catch (CameraAccessException e) {
             result.error("CameraAccessException", e.getMessage(), null);
         } catch (IllegalArgumentException e) {
@@ -121,46 +82,6 @@ final class MediaRecorderCamera implements Camera {
                 });
     }
 
-    private void computeBestPreviewAndRecordingSize(
-            StreamConfigurationMap streamConfigurationMap, Size minPreviewSize, Size captureSize) {
-        Size[] sizes = streamConfigurationMap.getOutputSizes(SurfaceTexture.class);
-        float captureSizeRatio = (float) captureSize.getWidth() / captureSize.getHeight();
-        List<Size> goodEnough = new ArrayList<>();
-        for (Size s : sizes) {
-            if ((float) s.getWidth() / s.getHeight() == captureSizeRatio
-                    && minPreviewSize.getWidth() < s.getWidth()
-                    && minPreviewSize.getHeight() < s.getHeight()) {
-                goodEnough.add(s);
-            }
-        }
-
-        Collections.sort(goodEnough, new CompareSizesByArea());
-
-        if (goodEnough.isEmpty()) {
-            previewSize = sizes[0];
-            videoSize = sizes[0];
-        } else {
-            previewSize = goodEnough.get(0);
-
-            // Video capture size should not be greater than 1080 because MediaRecorder cannot attachTo higher
-            // resolutions.
-            videoSize = goodEnough.get(0);
-            for (int i = goodEnough.size() - 1; i >= 0; i--) {
-                if (goodEnough.get(i).getHeight() <= 1080) {
-                    videoSize = goodEnough.get(i);
-                    break;
-                }
-            }
-        }
-    }
-
-    private void computeBestCaptureSize(StreamConfigurationMap streamConfigurationMap) {
-        // For still image captures, we use the largest available size.
-        captureSize = Collections.max(
-                Arrays.asList(streamConfigurationMap.getOutputSizes(ImageFormat.JPEG)),
-                new CompareSizesByArea());
-    }
-
     private void prepareMediaRecorder(int rotation, String outputFilePath) throws IOException {
         if (mediaRecorder != null) {
             mediaRecorder.release();
@@ -174,22 +95,20 @@ final class MediaRecorderCamera implements Camera {
         mediaRecorder.setVideoEncodingBitRate(1024 * 1000);
         mediaRecorder.setAudioSamplingRate(16000);
         mediaRecorder.setVideoFrameRate(27);
-        mediaRecorder.setVideoSize(videoSize.getWidth(), videoSize.getHeight());
+        mediaRecorder.setVideoSize(cameraInformation.getVideoSize().getWidth(),
+                cameraInformation.getVideoSize().getHeight());
         mediaRecorder.setOutputFile(outputFilePath);
-
-        int displayOrientation = ORIENTATIONS.get(rotation);
-        if (isFaceFrontingCamera) {
-            displayOrientation = -displayOrientation;
-        }
-        mediaRecorder.setOrientationHint((displayOrientation + sensorOrientation) % 360);
-
+        mediaRecorder.setOrientationHint(cameraInformation.getOrientationHint(rotation));
         mediaRecorder.prepare();
     }
 
     @Override
     public void open(final MethodChannel.Result result) {
         try {
-            imageReader = ImageReader.newInstance(captureSize.getWidth(), captureSize.getHeight(), ImageFormat.JPEG, 2);
+            imageReader = ImageReader.newInstance(cameraInformation.getCaptureSize().getWidth(),
+                    cameraInformation.getCaptureSize().getHeight(),
+                    ImageFormat.JPEG,
+                    2);
             cameraManagerService.openCamera(cameraName,
                     new CameraDevice.StateCallback() {
                         @Override
@@ -213,8 +132,8 @@ final class MediaRecorderCamera implements Camera {
                             if (result != null) {
                                 Map<String, Object> reply = new HashMap<>();
                                 reply.put("textureId", textureEntry.id());
-                                reply.put("previewWidth", previewSize.getWidth());
-                                reply.put("previewHeight", previewSize.getHeight());
+                                reply.put("previewWidth", cameraInformation.getPreviewSize().getWidth());
+                                reply.put("previewHeight", cameraInformation.getPreviewSize().getHeight());
                                 result.success(reply);
                             }
                         }
@@ -255,8 +174,8 @@ final class MediaRecorderCamera implements Camera {
                                         errorDescription = "Max cameras in use";
                                         break;
                                     case ERROR_CAMERA_DISABLED:
-                                        errorDescription =
-                                                "The camera device could not be opened due to a device policy.";
+                                        errorDescription
+                                                = "The camera device could not be opened due to a device policy.";
                                         break;
                                     case ERROR_CAMERA_DEVICE:
                                         errorDescription = "The camera device has encountered a fatal error";
@@ -310,15 +229,9 @@ final class MediaRecorderCamera implements Camera {
                 null);
 
         try {
-            final CaptureRequest.Builder captureBuilder =
-                    cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+            final CaptureRequest.Builder captureBuilder = cameraDevice.createCaptureRequest(TEMPLATE_STILL_CAPTURE);
             captureBuilder.addTarget(imageReader.getSurface());
-            int displayOrientation = ORIENTATIONS.get(rotation);
-            if (isFaceFrontingCamera) {
-                displayOrientation = -displayOrientation;
-            }
-            captureBuilder.set(
-                    CaptureRequest.JPEG_ORIENTATION, (-displayOrientation + sensorOrientation) % 360);
+            captureBuilder.set(JPEG_ORIENTATION, cameraInformation.getOrientationHint(rotation));
 
             cameraCaptureSession.capture(
                     captureBuilder.build(),
@@ -356,19 +269,11 @@ final class MediaRecorderCamera implements Camera {
         }
         try {
             closeCaptureSession();
-            prepareMediaRecorder(rotation, filePath);
 
+            prepareMediaRecorder(rotation, filePath);
             recordingVideo = true;
 
-            SurfaceTexture surfaceTexture = textureEntry.surfaceTexture();
-            surfaceTexture.setDefaultBufferSize(previewSize.getWidth(), previewSize.getHeight());
-            captureRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
-
-            List<Surface> surfaces = new ArrayList<>();
-
-            Surface previewSurface = new Surface(surfaceTexture);
-            surfaces.add(previewSurface);
-            captureRequestBuilder.addTarget(previewSurface);
+            List<Surface> surfaces = prepareCaptureRequestBuilder(CameraDevice.TEMPLATE_RECORD);
 
             Surface recorderSurface = mediaRecorder.getSurface();
             surfaces.add(recorderSurface);
@@ -404,6 +309,21 @@ final class MediaRecorderCamera implements Camera {
         }
     }
 
+    @NonNull
+    private List<Surface> prepareCaptureRequestBuilder(final int templateRecord) throws CameraAccessException {
+        SurfaceTexture surfaceTexture = textureEntry.surfaceTexture();
+        surfaceTexture.setDefaultBufferSize(cameraInformation.getPreviewSize().getWidth(),
+                cameraInformation.getPreviewSize().getHeight());
+        captureRequestBuilder = cameraDevice.createCaptureRequest(templateRecord);
+
+        List<Surface> surfaces = new ArrayList<>();
+        Surface previewSurface = new Surface(surfaceTexture);
+        surfaces.add(previewSurface);
+        captureRequestBuilder.addTarget(previewSurface);
+
+        return surfaces;
+    }
+
     @Override
     public void stopVideoRecording(final MethodChannel.Result result) {
         if (!recordingVideo) {
@@ -425,19 +345,9 @@ final class MediaRecorderCamera implements Camera {
     @Override
     public void startPreview() throws CameraAccessException, CameraException {
         closeCaptureSession();
-
-        SurfaceTexture surfaceTexture = textureEntry.surfaceTexture();
-        surfaceTexture.setDefaultBufferSize(previewSize.getWidth(), previewSize.getHeight());
-        captureRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
-
-        List<Surface> surfaces = new ArrayList<>();
-
-        Surface previewSurface = new Surface(surfaceTexture);
-        surfaces.add(previewSurface);
-        captureRequestBuilder.addTarget(previewSurface);
+        List<Surface> surfaces = prepareCaptureRequestBuilder(CameraDevice.TEMPLATE_PREVIEW);
 
         surfaces.add(imageReader.getSurface());
-
         cameraDevice.createCaptureSession(surfaces,
                 new CameraCaptureSession.StateCallback() {
 
