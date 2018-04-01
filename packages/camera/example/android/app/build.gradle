@@ -16,12 +16,12 @@ apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
 
 android {
     compileSdkVersion 27
-
     lintOptions {
         disable 'InvalidPackage'
     }
 
     defaultConfig {
+        targetSdkVersion 27
         minSdkVersion 21
         applicationId "io.flutter.plugins.cameraexample"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
