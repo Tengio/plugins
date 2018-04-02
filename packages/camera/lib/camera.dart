@@ -1,15 +1,15 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-final MethodChannel _channel = const MethodChannel('plugins.flutter.io/camera')
-  ..invokeMethod('init');
+final MethodChannel _channel = const MethodChannel('plugins.flutter.io/camera')..invokeMethod('init');
 
 enum CameraLensDirection { front, back, external }
 
 enum ResolutionPreset { low, medium, high }
-
 
 // function to return the accordingly the resolution preset as chosen by the user
 String serializeResolutionPreset(ResolutionPreset resolutionPreset) {
@@ -42,11 +42,8 @@ CameraLensDirection _parseCameraLensDirection(String string) {
 /// May throw a [CameraException].
 Future<List<CameraDescription>> getAllAvailableCameras() async {
   try {
-    final List<dynamic> cameras = await _channel.invokeMethod(
-        'getAllAvailableCameras');
-    return cameras
-        .cast<Map<String, dynamic>>()
-        .map((Map<String, dynamic> camera) {
+    final List<dynamic> cameras = await _channel.invokeMethod('getAllAvailableCameras');
+    return cameras.cast<Map<String, dynamic>>().map((Map<String, dynamic> camera) {
       return new CameraDescription(
         name: camera['name'],
         lensDirection: _parseCameraLensDirection(camera['lensFacing']),
@@ -57,7 +54,6 @@ Future<List<CameraDescription>> getAllAvailableCameras() async {
   }
 }
 
-
 class CameraDescription {
   final String name;
   final CameraLensDirection lensDirection;
@@ -66,9 +62,7 @@ class CameraDescription {
 
   @override
   bool operator ==(Object o) {
-    return o is CameraDescription &&
-        o.name == name &&
-        o.lensDirection == lensDirection;
+    return o is CameraDescription && o.name == name && o.lensDirection == lensDirection;
   }
 
   @override
@@ -100,9 +94,7 @@ class CameraPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return controller.value.initialized
-        ? new Texture(textureId: controller._textureId)
-        : new Container();
+    return controller.value.initialized ? new Texture(textureId: controller._textureId) : new Container();
   }
 }
 
@@ -118,19 +110,23 @@ class CameraValue {
 
   final String errorDescription;
 
+  final int rotation;
+
   /// The size of the preview in pixels.
   ///
   /// Is `null` until  [initialized] is `true`.
   final Size previewSize;
 
-  const CameraValue({this.opened,
+  const CameraValue({
+    this.opened,
     this.initialized,
     this.errorDescription,
     this.previewSize,
-    this.recordingVideo});
+    this.recordingVideo,
+    this.rotation,
+  });
 
-  const CameraValue.uninitialized()
-      : this(opened: true, initialized: false, recordingVideo: false);
+  const CameraValue.uninitialized() : this(opened: true, initialized: false, recordingVideo: false);
 
   /// Convenience getter for `previewSize.height / previewSize.width`.
   ///
@@ -145,6 +141,7 @@ class CameraValue {
     bool recordingVideo,
     String errorDescription,
     Size previewSize,
+    int rotation, //Device dependent
   }) {
     return new CameraValue(
       opened: opened ?? this.opened,
@@ -152,7 +149,34 @@ class CameraValue {
       errorDescription: errorDescription ?? this.errorDescription,
       previewSize: previewSize ?? this.previewSize,
       recordingVideo: recordingVideo ?? this.recordingVideo,
+      rotation: rotation ?? this.rotation,
     );
+  }
+
+  double get rotationAngle => Platform.isIOS ? getRotationForIOS() : getRotationForAndroid();
+
+  double getRotationForIOS() {
+    switch (rotation) {
+      case 2: // portraitUpsideDown
+        return pi;
+      case 3: // landscapeLeft
+        return 3 * pi / 2;
+      case 4: // landscapeRight
+        return pi / 2;
+    }
+    return 0.0; //Portrait or unknown
+  }
+
+  double getRotationForAndroid() {
+    switch (rotation) {
+      case 1: // landscapeLeft
+        return 3 * pi / 2;
+      case 2: // portraitUpsideDown
+        return pi;
+      case 3: // landscapeRight
+        return pi / 2;
+    }
+    return 0.0; // Portrait or unknown
   }
 
   @override
@@ -162,7 +186,8 @@ class CameraValue {
         'recordingVideo: $recordingVideo, '
         'initialized: $initialized, '
         'errorDescription: $errorDescription, '
-        'previewSize: $previewSize)';
+        'previewSize: $previewSize, '
+        'rotation: $rotation)';
   }
 }
 
@@ -182,8 +207,7 @@ class CameraController extends ValueNotifier<CameraValue> {
   StreamSubscription<Map<String, dynamic>> _eventSubscription;
   Completer<Null> _creatingCompleter;
 
-  CameraController(this.description, this.resolutionPreset)
-      : super(const CameraValue.uninitialized());
+  CameraController(this.description, this.resolutionPreset) : super(const CameraValue.uninitialized());
 
   /// Initializes the camera on the device.
   ///
@@ -203,20 +227,17 @@ class CameraController extends ValueNotifier<CameraValue> {
       );
       _textureId = reply['textureId'];
       value = value.copyWith(
-        initialized: true,
-        previewSize: new Size(
-          reply['previewWidth'].toDouble(),
-          reply['previewHeight'].toDouble(),
-        ),
-      );
+          initialized: true,
+          previewSize: new Size(
+            reply['previewWidth'].toDouble(),
+            reply['previewHeight'].toDouble(),
+          ),
+          rotation: reply["rotation"]);
     } on PlatformException catch (e) {
       value = value.copyWith(errorDescription: e.message);
       throw new CameraException(e.code, e.message);
     }
-    _eventSubscription =
-        new EventChannel('flutter.io/cameraPlugin/cameraEvents$_textureId')
-            .receiveBroadcastStream()
-            .listen(_listener);
+    _eventSubscription = new EventChannel('flutter.io/cameraPlugin/cameraEvents$_textureId').receiveBroadcastStream().listen(_listener);
     _creatingCompleter.complete(null);
   }
 
@@ -298,8 +319,6 @@ class CameraController extends ValueNotifier<CameraValue> {
       throw new CameraException(e.code, e.message);
     }
   }
-
-
 
   /// Releases the resources of this camera.
   @override

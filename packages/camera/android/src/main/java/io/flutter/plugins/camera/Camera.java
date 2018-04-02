@@ -7,15 +7,15 @@ import io.flutter.plugin.common.MethodChannel;
 
 interface Camera {
 
+    void startPreview() throws CameraAccessException, CameraException;
+
     void open(MethodChannel.Result result);
 
-    void takePicture(int rotation, String filePath, MethodChannel.Result result);
+    void takePicture(String filePath, MethodChannel.Result result);
 
-    void startVideoRecording(int rotation, String filePath, MethodChannel.Result result);
+    void startVideoRecording(String filePath, MethodChannel.Result result);
 
     void stopVideoRecording(MethodChannel.Result result);
-
-    void startPreview() throws CameraAccessException, CameraException;
 
     void close();
 

@@ -81,15 +81,11 @@ class CameraManager {
     }
 
     void startVideoRecording(final String filePath, final MethodChannel.Result result) {
-        camera.startVideoRecording(getDisplayRotation(), filePath, result);
+        camera.startVideoRecording(filePath, result);
     }
 
     void takePicture(final String path, final MethodChannel.Result result) {
-        camera.takePicture(getDisplayRotation(), path, result);
-    }
-
-    private int getDisplayRotation() {
-        return registrar.activity().getWindowManager().getDefaultDisplay().getRotation();
+        camera.takePicture(path, result);
     }
 
     void dispose() {

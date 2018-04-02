@@ -58,6 +58,7 @@ final class MediaRecorderCamera implements Camera {
         registerEventChannel(registrar);
         try {
             cameraInformation = cameraManagerService.computeCameraInformation(cameraName, resolutionPreset);
+            Log.e(TAG, "CameraInformation: " + cameraInformation);
         } catch (CameraAccessException e) {
             result.error("CameraAccessException", e.getMessage(), null);
         } catch (IllegalArgumentException e) {
@@ -65,50 +66,42 @@ final class MediaRecorderCamera implements Camera {
         }
     }
 
-    private void registerEventChannel(final PluginRegistry.Registrar registrar) {
-        new EventChannel(
-                registrar.messenger(),
-                "flutter.io/cameraPlugin/cameraEvents" + textureEntry.id()).setStreamHandler(
-                new EventChannel.StreamHandler() {
+    @Override
+    public void startPreview() throws CameraAccessException, CameraException {
+        closeCaptureSession();
+        List<Surface> surfaces = prepareCaptureRequestBuilder(CameraDevice.TEMPLATE_PREVIEW);
+
+        surfaces.add(imageReader.getSurface());
+        cameraDevice.createCaptureSession(surfaces,
+                new CameraCaptureSession.StateCallback() {
+
                     @Override
-                    public void onListen(Object arguments, EventChannel.EventSink eventSink) {
-                        MediaRecorderCamera.this.eventSink = eventSink;
+                    public void onConfigured(@NonNull CameraCaptureSession session) {
+                        try {
+                            if (cameraDevice == null) {
+                                Log.e(TAG, "onConfigured: MediaRecorderCamera was closed during configuration.");
+                                return;
+                            }
+                            cameraCaptureSession = session;
+                            captureRequestBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+                            cameraCaptureSession.setRepeatingRequest(captureRequestBuilder.build(), null, null);
+                        } catch (CameraAccessException e) {
+                            e.printStackTrace();
+                        }
                     }
 
                     @Override
-                    public void onCancel(Object arguments) {
-                        MediaRecorderCamera.this.eventSink = null;
+                    public void onConfigureFailed(@NonNull CameraCaptureSession cameraCaptureSession) {
+                        Log.e(TAG, "onConfigureFailed: Failed to configure camera for preview.");
                     }
-                });
-    }
-
-    private void prepareMediaRecorder(int rotation, String outputFilePath) throws IOException {
-        if (mediaRecorder != null) {
-            mediaRecorder.release();
-        }
-        mediaRecorder = new MediaRecorder();
-        mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-        mediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
-        mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
-        mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
-        mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
-        mediaRecorder.setVideoEncodingBitRate(1024 * 1000);
-        mediaRecorder.setAudioSamplingRate(16000);
-        mediaRecorder.setVideoFrameRate(27);
-        mediaRecorder.setVideoSize(cameraInformation.getVideoSize().getWidth(),
-                cameraInformation.getVideoSize().getHeight());
-        mediaRecorder.setOutputFile(outputFilePath);
-        mediaRecorder.setOrientationHint(cameraInformation.getOrientationHint(rotation));
-        mediaRecorder.prepare();
+                }, null);
     }
 
     @Override
     public void open(final MethodChannel.Result result) {
         try {
             imageReader = ImageReader.newInstance(cameraInformation.getCaptureSize().getWidth(),
-                    cameraInformation.getCaptureSize().getHeight(),
-                    ImageFormat.JPEG,
-                    2);
+                    cameraInformation.getCaptureSize().getHeight(), ImageFormat.JPEG, 2);
             cameraManagerService.openCamera(cameraName,
                     new CameraDevice.StateCallback() {
                         @Override
@@ -134,6 +127,7 @@ final class MediaRecorderCamera implements Camera {
                                 reply.put("textureId", textureEntry.id());
                                 reply.put("previewWidth", cameraInformation.getPreviewSize().getWidth());
                                 reply.put("previewHeight", cameraInformation.getPreviewSize().getHeight());
+                                reply.put("rotation", cameraManagerService.getDisplayRotation());
                                 result.success(reply);
                             }
                         }
@@ -201,18 +195,9 @@ final class MediaRecorderCamera implements Camera {
         }
     }
 
-    private void writeToFile(ByteBuffer buffer, File file) throws IOException {
-        try (FileOutputStream outputStream = new FileOutputStream(file)) {
-            while (0 < buffer.remaining()) {
-                outputStream.getChannel().write(buffer);
-            }
-        }
-    }
-
     @Override
-    public void takePicture(int rotation, String filePath, final MethodChannel.Result result) {
+    public void takePicture(String filePath, final MethodChannel.Result result) {
         final File file = new File(filePath);
-
         imageReader.setOnImageAvailableListener(
                 new ImageReader.OnImageAvailableListener() {
                     @Override
@@ -229,12 +214,11 @@ final class MediaRecorderCamera implements Camera {
                 null);
 
         try {
-            final CaptureRequest.Builder captureBuilder = cameraDevice.createCaptureRequest(TEMPLATE_STILL_CAPTURE);
-            captureBuilder.addTarget(imageReader.getSurface());
-            captureBuilder.set(JPEG_ORIENTATION, cameraInformation.getOrientationHint(rotation));
-
+            final CaptureRequest.Builder cb = cameraDevice.createCaptureRequest(TEMPLATE_STILL_CAPTURE);
+            cb.addTarget(imageReader.getSurface());
+            cb.set(JPEG_ORIENTATION, cameraInformation.getOrientationHint(cameraManagerService.getDisplayRotation()));
             cameraCaptureSession.capture(
-                    captureBuilder.build(),
+                    cb.build(),
                     new CameraCaptureSession.CaptureCallback() {
                         @Override
                         public void onCaptureFailed(
@@ -262,7 +246,7 @@ final class MediaRecorderCamera implements Camera {
     }
 
     @Override
-    public void startVideoRecording(int rotation, String filePath, final MethodChannel.Result result) {
+    public void startVideoRecording(String filePath, final MethodChannel.Result result) {
         if (cameraDevice == null) {
             result.error("configureFailed", "MediaRecorderCamera was closed during configuration.", null);
             return;
@@ -270,7 +254,7 @@ final class MediaRecorderCamera implements Camera {
         try {
             closeCaptureSession();
 
-            prepareMediaRecorder(rotation, filePath);
+            prepareMediaRecorder(filePath);
             recordingVideo = true;
 
             List<Surface> surfaces = prepareCaptureRequestBuilder(CameraDevice.TEMPLATE_RECORD);
@@ -309,21 +293,6 @@ final class MediaRecorderCamera implements Camera {
         }
     }
 
-    @NonNull
-    private List<Surface> prepareCaptureRequestBuilder(final int templateRecord) throws CameraAccessException {
-        SurfaceTexture surfaceTexture = textureEntry.surfaceTexture();
-        surfaceTexture.setDefaultBufferSize(cameraInformation.getPreviewSize().getWidth(),
-                cameraInformation.getPreviewSize().getHeight());
-        captureRequestBuilder = cameraDevice.createCaptureRequest(templateRecord);
-
-        List<Surface> surfaces = new ArrayList<>();
-        Surface previewSurface = new Surface(surfaceTexture);
-        surfaces.add(previewSurface);
-        captureRequestBuilder.addTarget(previewSurface);
-
-        return surfaces;
-    }
-
     @Override
     public void stopVideoRecording(final MethodChannel.Result result) {
         if (!recordingVideo) {
@@ -339,45 +308,6 @@ final class MediaRecorderCamera implements Camera {
             result.success("stopVideoRecording called successfully.");
         } catch (Exception e) {
             result.error("videoRecordingFailed", e.getMessage(), null);
-        }
-    }
-
-    @Override
-    public void startPreview() throws CameraAccessException, CameraException {
-        closeCaptureSession();
-        List<Surface> surfaces = prepareCaptureRequestBuilder(CameraDevice.TEMPLATE_PREVIEW);
-
-        surfaces.add(imageReader.getSurface());
-        cameraDevice.createCaptureSession(surfaces,
-                new CameraCaptureSession.StateCallback() {
-
-                    @Override
-                    public void onConfigured(@NonNull CameraCaptureSession session) {
-                        try {
-                            if (cameraDevice == null) {
-                                Log.e(TAG, "onConfigured: MediaRecorderCamera was closed during configuration.");
-                                return;
-                            }
-                            cameraCaptureSession = session;
-                            captureRequestBuilder.set(CaptureRequest.CONTROL_MODE,
-                                    CameraMetadata.CONTROL_MODE_AUTO);
-                            cameraCaptureSession.setRepeatingRequest(captureRequestBuilder.build(), null, null);
-                        } catch (CameraAccessException e) {
-                            e.printStackTrace();
-                        }
-                    }
-
-                    @Override
-                    public void onConfigureFailed(@NonNull CameraCaptureSession cameraCaptureSession) {
-                        Log.e(TAG, "onConfigureFailed: Failed to configure camera for preview.");
-                    }
-                }, null);
-    }
-
-    private void closeCaptureSession() {
-        if (cameraCaptureSession != null) {
-            cameraCaptureSession.close();
-            cameraCaptureSession = null;
         }
     }
 
@@ -403,5 +333,72 @@ final class MediaRecorderCamera implements Camera {
     public void dispose() {
         close();
         textureEntry.release();
+    }
+
+    private void closeCaptureSession() {
+        if (cameraCaptureSession != null) {
+            cameraCaptureSession.close();
+            cameraCaptureSession = null;
+        }
+    }
+
+    @NonNull
+    private List<Surface> prepareCaptureRequestBuilder(final int templateRecord) throws CameraAccessException {
+        SurfaceTexture surfaceTexture = textureEntry.surfaceTexture();
+        surfaceTexture.setDefaultBufferSize(cameraInformation.getPreviewSize().getWidth(),
+                cameraInformation.getPreviewSize().getHeight());
+        captureRequestBuilder = cameraDevice.createCaptureRequest(templateRecord);
+
+        List<Surface> surfaces = new ArrayList<>();
+        Surface previewSurface = new Surface(surfaceTexture);
+        surfaces.add(previewSurface);
+        captureRequestBuilder.addTarget(previewSurface);
+        return surfaces;
+    }
+
+    private void writeToFile(ByteBuffer buffer, File file) throws IOException {
+        try (FileOutputStream outputStream = new FileOutputStream(file)) {
+            while (0 < buffer.remaining()) {
+                outputStream.getChannel().write(buffer);
+            }
+        }
+    }
+
+    private void registerEventChannel(final PluginRegistry.Registrar registrar) {
+        new EventChannel(
+                registrar.messenger(),
+                "flutter.io/cameraPlugin/cameraEvents" + textureEntry.id()).setStreamHandler(
+                new EventChannel.StreamHandler() {
+                    @Override
+                    public void onListen(Object arguments, EventChannel.EventSink eventSink) {
+                        MediaRecorderCamera.this.eventSink = eventSink;
+                    }
+
+                    @Override
+                    public void onCancel(Object arguments) {
+                        MediaRecorderCamera.this.eventSink = null;
+                    }
+                });
+    }
+
+    private void prepareMediaRecorder(String outputFilePath) throws IOException {
+        if (mediaRecorder != null) {
+            mediaRecorder.release();
+        }
+        mediaRecorder = new MediaRecorder();
+        mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+        mediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
+        mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+        mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+        mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
+        mediaRecorder.setVideoEncodingBitRate(1024 * 1000);
+        mediaRecorder.setAudioSamplingRate(16000);
+        mediaRecorder.setVideoFrameRate(27);
+        mediaRecorder.setVideoSize(cameraInformation.getVideoSize().getWidth(),
+                cameraInformation.getVideoSize().getHeight());
+        mediaRecorder.setOutputFile(outputFilePath);
+        int rotation = cameraManagerService.getDisplayRotation();
+        mediaRecorder.setOrientationHint(cameraInformation.getOrientationHint(rotation));
+        mediaRecorder.prepare();
     }
 }

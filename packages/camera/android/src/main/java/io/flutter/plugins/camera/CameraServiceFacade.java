@@ -37,11 +37,16 @@ class CameraServiceFacade {
             append(Surface.ROTATION_270, 270);
         }
     };
-
-    private CameraManager cameraManager;
+    private final PluginRegistry.Registrar registrar;
+    private final CameraManager cameraManager;
 
     CameraServiceFacade(final PluginRegistry.Registrar registrar) {
+        this.registrar = registrar;
         cameraManager = (CameraManager) registrar.activity().getSystemService(Context.CAMERA_SERVICE);
+    }
+
+    int getDisplayRotation() {
+        return registrar.activity().getWindowManager().getDefaultDisplay().getRotation();
     }
 
     @SuppressWarnings("ConstantConditions")
@@ -151,60 +156,68 @@ class CameraServiceFacade {
         private Size previewSize;
         private Size videoSize;
 
-        public int getSensorOrientation() {
-            return sensorOrientation;
-        }
-
-        public void setSensorOrientation(final int sensorOrientation) {
+        void setSensorOrientation(final int sensorOrientation) {
             this.sensorOrientation = sensorOrientation;
         }
 
-        public boolean isFaceFrontingCamera() {
+        boolean isFaceFrontingCamera() {
             return isFaceFrontingCamera;
         }
 
-        public void setFaceFrontingCamera(final boolean faceFrontingCamera) {
+        void setFaceFrontingCamera(final boolean faceFrontingCamera) {
             isFaceFrontingCamera = faceFrontingCamera;
         }
 
-        public Size getCaptureSize() {
+        Size getCaptureSize() {
             return captureSize;
         }
 
-        public void setCaptureSize(final Size captureSize) {
+        void setCaptureSize(final Size captureSize) {
             this.captureSize = captureSize;
         }
 
-        public Size getPreviewSize() {
+        Size getPreviewSize() {
             return previewSize;
         }
 
-        public void setPreviewSize(final Size previewSize) {
+        void setPreviewSize(final Size previewSize) {
             this.previewSize = previewSize;
         }
 
-        public Size getVideoSize() {
+        Size getVideoSize() {
             return videoSize;
         }
 
-        public void setVideoSize(final Size videoSize) {
+        void setVideoSize(final Size videoSize) {
             this.videoSize = videoSize;
         }
 
-        public Size getMinPreviewSize() {
+        Size getMinPreviewSize() {
             return minPreviewSize;
         }
 
-        public void setMinPreviewSize(final Size minPreviewSize) {
+        void setMinPreviewSize(final Size minPreviewSize) {
             this.minPreviewSize = minPreviewSize;
         }
 
-        public Integer getOrientationHint(final int rotation) {
+        Integer getOrientationHint(final int rotation) {
             Integer displayOrientation = ORIENTATIONS.get(rotation);
             if (isFaceFrontingCamera()) {
                 displayOrientation = -displayOrientation;
             }
-            return (displayOrientation + sensorOrientation) % 360;
+            return (-displayOrientation + sensorOrientation) % 360;
+        }
+
+        @Override
+        public String toString() {
+            return "CameraInformation{" +
+                    "sensorOrientation=" + sensorOrientation +
+                    ", isFaceFrontingCamera=" + isFaceFrontingCamera +
+                    ", captureSize=" + captureSize +
+                    ", minPreviewSize=" + minPreviewSize +
+                    ", previewSize=" + previewSize +
+                    ", videoSize=" + videoSize +
+                    '}';
         }
     }
 }
