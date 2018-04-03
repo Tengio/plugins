@@ -48,7 +48,8 @@ final class MediaRecorderCamera implements Camera {
     private CameraServiceFacade.CameraInformation cameraInformation;
     private boolean recordingVideo;
 
-    @SuppressWarnings("ConstantConditions") MediaRecorderCamera(final PluginRegistry.Registrar registrar,
+    @SuppressWarnings("ConstantConditions")
+    MediaRecorderCamera(final PluginRegistry.Registrar registrar,
             final String cameraName,
             final String resolutionPreset,
             final MethodChannel.Result result) {
@@ -58,7 +59,6 @@ final class MediaRecorderCamera implements Camera {
         registerEventChannel(registrar);
         try {
             cameraInformation = cameraManagerService.computeCameraInformation(cameraName, resolutionPreset);
-            Log.e(TAG, "CameraInformation: " + cameraInformation);
         } catch (CameraAccessException e) {
             result.error("CameraAccessException", e.getMessage(), null);
         } catch (IllegalArgumentException e) {
@@ -127,7 +127,7 @@ final class MediaRecorderCamera implements Camera {
                                 reply.put("textureId", textureEntry.id());
                                 reply.put("previewWidth", cameraInformation.getPreviewSize().getWidth());
                                 reply.put("previewHeight", cameraInformation.getPreviewSize().getHeight());
-                                reply.put("rotation", cameraManagerService.getDisplayRotation());
+                                    reply.put("rotation", cameraManagerService.getDisplayRotation());
                                 result.success(reply);
                             }
                         }

@@ -16,6 +16,7 @@ import android.view.Surface;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -207,17 +208,15 @@ class CameraServiceFacade {
             }
             return (-displayOrientation + sensorOrientation) % 360;
         }
+    }
+
+    class CompareSizesByArea implements Comparator<Size> {
 
         @Override
-        public String toString() {
-            return "CameraInformation{" +
-                    "sensorOrientation=" + sensorOrientation +
-                    ", isFaceFrontingCamera=" + isFaceFrontingCamera +
-                    ", captureSize=" + captureSize +
-                    ", minPreviewSize=" + minPreviewSize +
-                    ", previewSize=" + previewSize +
-                    ", videoSize=" + videoSize +
-                    '}';
+        public int compare(Size lhs, Size rhs) {
+            // We cast here to ensure the multiplications won't overflow.
+            return Long.signum(
+                    (long) lhs.getWidth() * lhs.getHeight() - (long) rhs.getWidth() * rhs.getHeight());
         }
     }
 }
