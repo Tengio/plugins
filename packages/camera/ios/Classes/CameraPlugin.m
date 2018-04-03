@@ -469,12 +469,14 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
                                                  binaryMessenger:_messenger];
             [eventChannel setStreamHandler:cam];
             cam.eventChannel = eventChannel;
+            int orientation = UIDevice.currentDevice.orientation;
             result(@{
                      @"textureId" : @(textureId),
                      @"previewWidth" : @(cam.previewSize.width),
                      @"previewHeight" : @(cam.previewSize.height),
                      @"captureWidth" : @(cam.captureSize.width),
                      @"captureHeight" : @(cam.captureSize.height),
+                     @"rotation" : @(orientation),
                      });
             // starting the choosen cam
             FLTCam *cam2 = _cams[@(textureId)];
