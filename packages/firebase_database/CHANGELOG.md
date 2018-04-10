@@ -1,10 +1,26 @@
+## 0.4.1
+
+* Fixes Dart 2 runtime cast error.
+
+## 0.4.0
+
+* **Breaking change**. Set SDK constraints to match the Flutter beta release.
+
+## 0.3.6
+
+* Fixed Dart 2 type errors.
+
+## 0.3.5
+
+* Enabled use in Swift projects.
+
 ## 0.3.4
 
 * Allow null values for Query startAt, endAt, and equalTo
 
 ## 0.3.3
 
-* Support to specify a database by URL if required 
+* Support to specify a database by URL if required
 
 ## 0.3.2
 

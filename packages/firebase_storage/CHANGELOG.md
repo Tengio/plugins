@@ -1,3 +1,15 @@
+## 0.2.0
+
+* **Breaking change**. Set SDK constraints to match the Flutter beta release.
+
+## 0.1.5
+
+* Fix Dart 2 type errors.
+
+## 0.1.4
+
+* Enabled use in Swift projects.
+
 ## 0.1.3
 
 * Added StorageReference `path` getter to retrieve the path component for the storage node.

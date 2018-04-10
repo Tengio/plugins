@@ -27,6 +27,8 @@ abstract class MobileAd extends AdListener {
   final MethodChannel channel;
   final int id;
   Status status;
+  double anchorOffset;
+  int anchorType;
 
   enum Status {
     CREATED,
@@ -41,12 +43,14 @@ abstract class MobileAd extends AdListener {
     this.activity = activity;
     this.channel = channel;
     this.status = Status.CREATED;
+    this.anchorOffset = 0.0;
+    this.anchorType = Gravity.BOTTOM;
     allAds.put(id, this);
   }
 
-  static Banner createBanner(Integer id, Activity activity, MethodChannel channel) {
+  static Banner createBanner(Integer id, AdSize adSize, Activity activity, MethodChannel channel) {
     MobileAd ad = getAdForId(id);
-    return (ad != null) ? (Banner) ad : new Banner(id, activity, channel);
+    return (ad != null) ? (Banner) ad : new Banner(id, adSize, activity, channel);
   }
 
   static Interstitial createInterstitial(Integer id, Activity activity, MethodChannel channel) {
@@ -119,9 +123,11 @@ abstract class MobileAd extends AdListener {
 
   static class Banner extends MobileAd {
     private AdView adView;
+    private AdSize adSize;
 
-    private Banner(Integer id, Activity activity, MethodChannel channel) {
+    private Banner(Integer id, AdSize adSize, Activity activity, MethodChannel channel) {
       super(id, activity, channel);
+      this.adSize = adSize;
     }
 
     @Override
@@ -130,7 +136,7 @@ abstract class MobileAd extends AdListener {
       status = Status.LOADING;
 
       adView = new AdView(activity);
-      adView.setAdSize(AdSize.SMART_BANNER);
+      adView.setAdSize(adSize);
       adView.setAdUnitId(adUnitId);
       adView.setAdListener(this);
 
@@ -150,13 +156,20 @@ abstract class MobileAd extends AdListener {
         LinearLayout content = new LinearLayout(activity);
         content.setId(id);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setGravity(Gravity.BOTTOM);
+        content.setGravity(anchorType);
         content.addView(adView);
+        final float scale = activity.getResources().getDisplayMetrics().density;
+
+        if (anchorType == Gravity.BOTTOM) {
+          content.setPadding(0, 0, 0, (int) (anchorOffset * scale));
+        } else {
+          content.setPadding(0, (int) (anchorOffset * scale), 0, 0);
+        }
 
         activity.addContentView(
             content,
             new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
       }
     }
 

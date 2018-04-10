@@ -1,3 +1,15 @@
+## 0.2.0
+
+* **Breaking change**. Set SDK constraints to match the Flutter beta release.
+
+## 0.1.4
+
+* Fixed Dart 2 type error in example project.
+
+## 0.1.3
+
+* Enabled use in Swift projects.
+
 ## 0.1.2
 
 * Fix for APNS not being correctly registered on iOS when reinstalling application.

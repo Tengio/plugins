@@ -19,11 +19,14 @@ typedef enum : NSUInteger {
 - (FLTMobileAdStatus)status;
 - (void)loadWithAdUnitId:(NSString *)adUnitId targetingInfo:(NSDictionary *)targetingInfo;
 - (void)show;
+- (void)showAtOffset:(double)anchorOffset fromAnchor:(int)anchorType;
 - (void)dispose;
 @end
 
 @interface FLTBannerAd : FLTMobileAd<GADBannerViewDelegate>
-+ (instancetype)withId:(NSNumber *)mobileAdId channel:(FlutterMethodChannel *)channel;
++ (instancetype)withId:(NSNumber *)mobileAdId
+                adSize:(GADAdSize)adSize
+               channel:(FlutterMethodChannel *)channel;
 @end
 
 @interface FLTInterstitialAd : FLTMobileAd<GADInterstitialDelegate>

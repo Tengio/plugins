@@ -84,6 +84,8 @@ void main() {
                 'path': 'foo/bar',
                 'data': <String, dynamic>{'key1': 'val1'}
               };
+            } else if (methodCall.arguments['path'] == 'foo/notExists') {
+              return <String, dynamic>{'path': 'foo/notExists', 'data': null};
             }
             throw new PlatformException(code: 'UNKNOWN_PATH');
           case 'Firestore#runTransaction':
@@ -191,7 +193,7 @@ void main() {
         expect(document.reference.path, equals('foo/0'));
         expect(document.data, equals(kMockDocumentSnapshotData));
         // Flush the async removeListener call
-        await new Future<Null>.delayed(Duration.ZERO);
+        await new Future<Null>.delayed(Duration.zero);
         expect(log, <Matcher>[
           isMethodCall(
             'Query#addSnapshotListener',
@@ -216,7 +218,7 @@ void main() {
                 .snapshots
                 .listen((QuerySnapshot querySnapshot) {});
         subscription.cancel();
-        await new Future<Null>.delayed(Duration.ZERO);
+        await new Future<Null>.delayed(Duration.zero);
         expect(
           log,
           equals(<Matcher>[
@@ -246,7 +248,7 @@ void main() {
                 .snapshots
                 .listen((QuerySnapshot querySnapshot) {});
         subscription.cancel();
-        await new Future<Null>.delayed(Duration.ZERO);
+        await new Future<Null>.delayed(Duration.zero);
         expect(
           log,
           equals(<Matcher>[
@@ -276,7 +278,7 @@ void main() {
                 .snapshots
                 .listen((QuerySnapshot querySnapshot) {});
         subscription.cancel();
-        await new Future<Null>.delayed(Duration.ZERO);
+        await new Future<Null>.delayed(Duration.zero);
         expect(
           log,
           equals(<Matcher>[
@@ -309,7 +311,7 @@ void main() {
         expect(snapshot.reference.path, equals('path/to/foo'));
         expect(snapshot.data, equals(kMockDocumentSnapshotData));
         // Flush the async removeListener call
-        await new Future<Null>.delayed(Duration.ZERO);
+        await new Future<Null>.delayed(Duration.zero);
         expect(
           log,
           <Matcher>[
@@ -407,6 +409,12 @@ void main() {
         expect(snapshot.reference.path, equals('foo/bar'));
         expect(snapshot.data.containsKey('key1'), equals(true));
         expect(snapshot.data['key1'], equals('val1'));
+        expect(snapshot.exists, isTrue);
+
+        final DocumentSnapshot snapshot2 =
+            await collectionReference.document('notExists').get();
+        expect(snapshot2.data, isNull);
+        expect(snapshot2.exists, isFalse);
 
         try {
           await collectionReference.document('baz').get();

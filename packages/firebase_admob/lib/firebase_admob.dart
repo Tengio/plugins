@@ -82,6 +82,82 @@ class MobileAdTargetingInfo {
   }
 }
 
+enum AnchorType { bottom, top }
+
+// The types of ad sizes supported for banners. The names of the values are used
+// in MethodChannel calls to iOS and Android, and should not be changed.
+enum AdSizeType {
+  WidthAndHeight,
+  SmartBanner,
+}
+
+/// [AdSize] represents the size of a banner ad. There are six sizes available,
+/// which are the same for both iOS and Android. See the guides for banners on
+/// [Android](https://developers.google.com/admob/android/banner#banner_sizes)
+/// and [iOS](https://developers.google.com/admob/ios/banner#banner_sizes) for
+/// additional details.
+class AdSize {
+  final int height;
+  final int width;
+  final AdSizeType adSizeType;
+
+  // Private constructor. Apps should use the static constants rather than
+  // create their own instances of [AdSize].
+  const AdSize._({
+    @required this.width,
+    @required this.height,
+    @required this.adSizeType,
+  });
+
+  /// The standard banner (320x50) size.
+  static const AdSize banner = const AdSize._(
+    width: 320,
+    height: 50,
+    adSizeType: AdSizeType.WidthAndHeight,
+  );
+
+  /// The large banner (320x100) size.
+  static const AdSize largeBanner = const AdSize._(
+    width: 320,
+    height: 100,
+    adSizeType: AdSizeType.WidthAndHeight,
+  );
+
+  /// The medium rectangle (300x250) size.
+  static const AdSize mediumRectangle = const AdSize._(
+    width: 300,
+    height: 250,
+    adSizeType: AdSizeType.WidthAndHeight,
+  );
+
+  /// The full banner (468x60) size.
+  static const AdSize fullBanner = const AdSize._(
+    width: 468,
+    height: 60,
+    adSizeType: AdSizeType.WidthAndHeight,
+  );
+
+  /// The leaderboard (728x90) size.
+  static const AdSize leaderboard = const AdSize._(
+    width: 728,
+    height: 90,
+    adSizeType: AdSizeType.WidthAndHeight,
+  );
+
+  /// The smart banner size. Smart banners are unique in that the width and
+  /// height values declared here aren't used. At runtime, the Mobile Ads SDK
+  /// will automatically adjust the banner's width to match the width of the
+  /// displaying device's screen. It will also set the banner's height using a
+  /// calculation based on the displaying device's height. For more info see the
+  /// [Android](https://developers.google.com/admob/android/banner) and
+  /// [iOS](https://developers.google.com/admob/ios/banner) banner ad guides.
+  static const AdSize smartBanner = const AdSize._(
+    width: 0,
+    height: 0,
+    adSizeType: AdSizeType.SmartBanner,
+  );
+}
+
 /// A mobile [BannerAd] or [InterstitialAd] for the [FirebaseAdMobPlugin].
 ///
 /// A [MobileAd] must be loaded with [load] before it is shown with [show].
@@ -118,8 +194,6 @@ abstract class MobileAd {
   /// Plugin log messages will identify this property as the ad's `mobileAdId`.
   int get id => hashCode;
 
-  MethodChannel get _channel => FirebaseAdMob.instance._channel;
-
   /// Start loading this ad.
   Future<bool> load();
 
@@ -130,26 +204,26 @@ abstract class MobileAd {
   ///
   /// The [listener] will be notified when the ad has finished loading or fails
   /// to do so. An ad that fails to load will not be shown.
-  Future<bool> show() {
-    return _channel.invokeMethod("showAd", <String, dynamic>{'id': id});
+  ///
+  /// anchorOffset is the logical pixel offset from the edge of the screen (default 0.0)
+  /// anchorType place advert at top or bottom of screen (default bottom)
+  Future<bool> show(
+      {double anchorOffset = 0.0, AnchorType anchorType = AnchorType.bottom}) {
+    return _invokeBooleanMethod("showAd", <String, dynamic>{
+      'id': id,
+      'anchorOffset': anchorOffset.toString(),
+      'anchorType': anchorType == AnchorType.top ? "top" : "bottom"
+    });
   }
 
   /// Free the plugin resources associated with this ad.
   ///
-  /// Disposing a banner ad that's been shown removes it from the screen. Interstitial
-  /// ads can't be programatically removed from view.
+  /// Disposing a banner ad that's been shown removes it from the screen.
+  /// Interstitial ads can't be programmatically removed from view.
   Future<bool> dispose() {
     assert(_allAds[id] != null);
     _allAds[id] = null;
-    return _channel.invokeMethod("disposeAd", <String, dynamic>{'id': id});
-  }
-
-  Future<bool> _doLoad(String loadMethod) {
-    return _channel.invokeMethod(loadMethod, <String, dynamic>{
-      'id': id,
-      'adUnitId': adUnitId,
-      'targetingInfo': targetingInfo?.toJson(),
-    });
+    return _invokeBooleanMethod("disposeAd", <String, dynamic>{'id': id});
   }
 }
 
@@ -161,21 +235,32 @@ class BannerAd extends MobileAd {
       ? 'ca-app-pub-3940256099942544/6300978111'
       : 'ca-app-pub-3940256099942544/2934735716';
 
+  final AdSize size;
+
   /// Create a BannerAd.
   ///
   /// A valid [adUnitId] is required.
   BannerAd({
     @required String adUnitId,
+    @required this.size,
     MobileAdTargetingInfo targetingInfo,
     MobileAdListener listener,
-  })
-      : super(
+  }) : super(
             adUnitId: adUnitId,
             targetingInfo: targetingInfo,
             listener: listener);
 
   @override
-  Future<bool> load() => _doLoad("loadBannerAd");
+  Future<bool> load() {
+    return _invokeBooleanMethod("loadBannerAd", <String, dynamic>{
+      'id': id,
+      'adUnitId': adUnitId,
+      'targetingInfo': targetingInfo?.toJson(),
+      'width': size.width,
+      'height': size.height,
+      'adSizeType': size.adSizeType.toString(),
+    });
+  }
 }
 
 /// A full-screen interstitial ad for the [FirebaseAdMobPlugin].
@@ -194,14 +279,19 @@ class InterstitialAd extends MobileAd {
     String adUnitId,
     MobileAdTargetingInfo targetingInfo,
     MobileAdListener listener,
-  })
-      : super(
+  }) : super(
             adUnitId: adUnitId,
             targetingInfo: targetingInfo,
             listener: listener);
 
   @override
-  Future<bool> load() => _doLoad("loadInterstitialAd");
+  Future<bool> load() {
+    return _invokeBooleanMethod("loadInterstitialAd", <String, dynamic>{
+      'id': id,
+      'adUnitId': adUnitId,
+      'targetingInfo': targetingInfo?.toJson(),
+    });
+  }
 }
 
 /// [RewardedVideoAd] status changes reported to [RewardedVideoAdListener]s.
@@ -278,18 +368,16 @@ class RewardedVideoAd {
   /// Callback invoked for events in the rewarded video ad lifecycle.
   RewardedVideoAdListener listener;
 
-  MethodChannel get _channel => FirebaseAdMob.instance._channel;
-
   /// Shows a rewarded video ad if one has been loaded.
   Future<bool> show() {
-    return _channel.invokeMethod("showRewardedVideoAd");
+    return _invokeBooleanMethod("showRewardedVideoAd");
   }
 
   /// Loads a rewarded video ad using the provided ad unit ID.
   Future<bool> load(
       {@required String adUnitId, MobileAdTargetingInfo targetingInfo}) {
     assert(adUnitId.isNotEmpty);
-    return _channel.invokeMethod("loadRewardedVideoAd", <String, dynamic>{
+    return _invokeBooleanMethod("loadRewardedVideoAd", <String, dynamic>{
       'adUnitId': adUnitId,
       'targetingInfo': targetingInfo?.toJson(),
     });
@@ -369,7 +457,7 @@ class FirebaseAdMob {
       bool analyticsEnabled: false}) {
     assert(appId != null && appId.isNotEmpty);
     assert(analyticsEnabled != null);
-    return _channel.invokeMethod("initialize", <String, dynamic>{
+    return _invokeBooleanMethod("initialize", <String, dynamic>{
       'appId': appId,
       'trackingId': trackingId,
       'analyticsEnabled': analyticsEnabled,
@@ -404,4 +492,12 @@ class FirebaseAdMob {
 
     return new Future<Null>(null);
   }
+}
+
+Future<bool> _invokeBooleanMethod(String method, [dynamic arguments]) async {
+  final bool result = await FirebaseAdMob.instance._channel.invokeMethod(
+    method,
+    arguments,
+  );
+  return result;
 }
