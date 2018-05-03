@@ -330,6 +330,7 @@
   NSParameterAssert(_videoWriter);
   if (error) {
     _eventSink(@{@"event" : @"error", @"errorDescription" : error.description});
+    return NO;
   }
   NSDictionary *videoSettings = [NSDictionary
       dictionaryWithObjectsAndKeys:AVVideoCodecH264, AVVideoCodecKey,
