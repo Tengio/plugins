@@ -133,7 +133,7 @@
   if ([_captureDevice position] == AVCaptureDevicePositionFront) {
     connection.videoMirrored = YES;
   }
-  connection.videoOrientation = AVCaptureVideoOrientationLandscapeLeft;
+  connection.videoOrientation = AVCaptureVideoOrientationLandscapeRight;
   [_captureSession addInputWithNoConnections:_captureVideoInput];
   [_captureSession addOutputWithNoConnections:_captureVideoOutput];
   [_captureSession addConnection:connection];
@@ -331,16 +331,20 @@
         [NSURL fileURLWithPath:[documentsDirectoryPath stringByAppendingPathComponent:filename]];
   }
   _videoWriter =
-      [[AVAssetWriter alloc] initWithURL:outputURL fileType:AVFileTypeQuickTimeMovie error:&error];
+      [[AVAssetWriter alloc] initWithURL:outputURL fileType:AVFileTypeMPEG4 error:&error];
   NSParameterAssert(_videoWriter);
 
-  NSDictionary *videoSettings = [NSDictionary
-      dictionaryWithObjectsAndKeys:AVVideoCodecH264, AVVideoCodecKey,
-                                   [NSNumber numberWithInt:_previewSize.width], AVVideoWidthKey,
-                                   [NSNumber numberWithInt:_previewSize.height], AVVideoHeightKey,
-                                   nil];
+    NSDictionary* compression = @{
+                                  AVVideoAverageBitRateKey:[NSNumber numberWithInt:960000],
+                                  AVVideoMaxKeyFrameIntervalKey:[NSNumber numberWithInt:1]
+                                  };
   _videoWriterInput = [AVAssetWriterInput assetWriterInputWithMediaType:AVMediaTypeVideo
-                                                         outputSettings:videoSettings];
+                                                         outputSettings:@{
+                                                                          AVVideoCodecKey:AVVideoCodecH264,
+                                                                          AVVideoCompressionPropertiesKey:compression,
+                                                                          AVVideoWidthKey:[NSNumber numberWithInt:_previewSize.width],
+                                                                          AVVideoHeightKey:[NSNumber numberWithInt:_previewSize.height]
+                                                                          }];
   NSParameterAssert(_videoWriterInput);
   _videoWriterInput.expectsMediaDataInRealTime = YES;
 
