@@ -23,6 +23,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.util.Log;
 import android.util.Size;
 import android.util.SparseIntArray;
 import android.view.Surface;
@@ -414,7 +415,9 @@ public class CameraPlugin implements MethodCallHandler {
       int displayRotation = activity.getWindowManager().getDefaultDisplay().getRotation();
       int displayOrientation = ORIENTATIONS.get(displayRotation);
       if (isFrontFacing) displayOrientation = -displayOrientation;
-      mediaRecorder.setOrientationHint((displayOrientation + sensorOrientation) % 360);
+
+      //mediaRecorder.setOrientationHint((displayOrientation + sensorOrientation) % 360);
+      mediaRecorder.setOrientationHint(isFrontFacing ? 180 : 0);
 
       mediaRecorder.prepare();
     }
