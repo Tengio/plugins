@@ -26,8 +26,7 @@ IconData getCameraLensIcon(CameraLensDirection direction) {
   throw new ArgumentError('Unknown lens direction');
 }
 
-void logError(String code, String message) =>
-    print('Error: $code\nError Message: $message');
+void logError(String code, String message) => print('Error: $code\nError Message: $message');
 
 class _CameraExampleHomeState extends State<CameraExampleHome> {
   CameraController controller;
@@ -57,9 +56,7 @@ class _CameraExampleHomeState extends State<CameraExampleHome> {
             decoration: new BoxDecoration(
               color: Colors.black,
               border: new Border.all(
-                color: controller != null && controller.value.isRecordingVideo
-                    ? Colors.redAccent
-                    : Colors.grey,
+                color: controller != null && controller.value.isRecordingVideo ? Colors.redAccent : Colors.grey,
                 width: 3.0,
               ),
             ),
@@ -67,12 +64,10 @@ class _CameraExampleHomeState extends State<CameraExampleHome> {
         ),
         new Padding(
           padding: const EdgeInsets.all(5.0),
-          child: new Row(
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: <Widget>[
-                _cameraTogglesRowWidget(),
-                _thumbnailWidget(),
-              ]),
+          child: new Row(mainAxisAlignment: MainAxisAlignment.start, children: <Widget>[
+            _cameraTogglesRowWidget(),
+            _thumbnailWidget(),
+          ]),
         ),
         _captureControlRowWidget(),
       ]),
@@ -111,13 +106,10 @@ class _CameraExampleHomeState extends State<CameraExampleHome> {
                     : new Container(
                         child: new Center(
                           child: new AspectRatio(
-                              aspectRatio: videoController.value.size != null
-                                  ? videoController.value.aspectRatio
-                                  : 1.0,
+                              aspectRatio: videoController.value.size != null ? videoController.value.aspectRatio : 1.0,
                               child: new VideoPlayer(videoController)),
                         ),
-                        decoration: new BoxDecoration(
-                            border: new Border.all(color: Colors.pink)),
+                        decoration: new BoxDecoration(border: new Border.all(color: Colors.pink)),
                       ),
                 width: 64.0,
                 height: 64.0,
@@ -135,29 +127,21 @@ class _CameraExampleHomeState extends State<CameraExampleHome> {
         new IconButton(
           icon: const Icon(Icons.camera_alt),
           color: Colors.blue,
-          onPressed: controller != null &&
-                  controller.value.isInitialized &&
-                  !controller.value.isRecordingVideo
+          onPressed: controller != null && controller.value.isInitialized && !controller.value.isRecordingVideo
               ? onTakePictureButtonPressed
               : null,
         ),
         new IconButton(
           icon: const Icon(Icons.videocam),
           color: Colors.blue,
-          onPressed: controller != null &&
-                  controller.value.isInitialized &&
-                  !controller.value.isRecordingVideo
+          onPressed: controller != null && controller.value.isInitialized && !controller.value.isRecordingVideo
               ? onVideoRecordButtonPressed
               : null,
         ),
         new IconButton(
           icon: const Icon(Icons.stop),
           color: Colors.red,
-          onPressed: controller != null &&
-                  controller.value.isInitialized &&
-                  controller.value.isRecordingVideo
-              ? onStopButtonPressed
-              : null,
+          onPressed: controller != null && controller.value.isInitialized && controller.value.isRecordingVideo ? onStopButtonPressed : null,
         )
       ],
     );
@@ -175,12 +159,10 @@ class _CameraExampleHomeState extends State<CameraExampleHome> {
           new SizedBox(
             width: 90.0,
             child: new RadioListTile<CameraDescription>(
-                title: new Icon(
-                    getCameraLensIcon(cameraDescription.lensDirection)),
+                title: new Icon(getCameraLensIcon(cameraDescription.lensDirection)),
                 groupValue: controller?.description,
                 value: cameraDescription,
-                onChanged: (CameraDescription newValue) async =>
-                    onNewCameraSelected(newValue)),
+                onChanged: (CameraDescription newValue) async => onNewCameraSelected(newValue)),
           ),
         );
       }
@@ -192,8 +174,7 @@ class _CameraExampleHomeState extends State<CameraExampleHome> {
   String timestamp() => new DateTime.now().millisecondsSinceEpoch.toString();
 
   void showInSnackBar(String message) {
-    _scaffoldKey.currentState
-        .showSnackBar(new SnackBar(content: new Text(message)));
+    _scaffoldKey.currentState.showSnackBar(new SnackBar(content: new Text(message)));
   }
 
   void onNewCameraSelected(CameraDescription cameraDescription) async {
@@ -254,13 +235,14 @@ class _CameraExampleHomeState extends State<CameraExampleHome> {
       showInSnackBar('Error: select a camera first.');
       return null;
     }
-    final Directory extDir = await getApplicationDocumentsDirectory();
+    final Directory extDir = await getExternalStorageDirectory();
     final String dirPath = '${extDir.path}/Movies/flutter_test';
     await new Directory(dirPath).create(recursive: true);
     final String filePath = '$dirPath/${timestamp()}.mp4';
     try {
-      videoPath = filePath;
-      await controller.startVideoRecording(filePath);
+      String t = timestamp();
+      videoPath = "/storage/emulated/0/Movies/flutter_test/$t.mp4";
+      await controller.startVideoRecording("/Movies/flutter_test/$t.mp4");
     } on CameraException catch (e) {
       logError(e.code, e.description);
       return null;
@@ -275,8 +257,7 @@ class _CameraExampleHomeState extends State<CameraExampleHome> {
       } on CameraException catch (e) {
         logError(e.code, e.description);
       }
-      final VideoPlayerController vcontroller =
-          new VideoPlayerController.file(new File(videoPath));
+      final VideoPlayerController vcontroller = new VideoPlayerController.file(new File(videoPath));
       vcontroller.play();
       vcontroller.setLooping(true);
       videoPlayerListener = () {
