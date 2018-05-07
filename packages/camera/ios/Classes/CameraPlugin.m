@@ -333,8 +333,9 @@
     return NO;
   }
   NSDictionary* compression = @{
-                                  AVVideoAverageBitRateKey:[NSNumber numberWithInt:1024000],
-                                  AVVideoMaxKeyFrameIntervalKey:[NSNumber numberWithInt:1]
+                                  AVVideoAverageBitRateKey:[NSNumber numberWithInt:2300000],
+                                  AVVideoMaxKeyFrameIntervalKey:[NSNumber numberWithInt:1],
+                                  AVVideoProfileLevelKey: AVVideoProfileLevelH264High40,
                                   };
   _videoWriterInput = [AVAssetWriterInput assetWriterInputWithMediaType:AVMediaTypeVideo
                                                          outputSettings:@{
