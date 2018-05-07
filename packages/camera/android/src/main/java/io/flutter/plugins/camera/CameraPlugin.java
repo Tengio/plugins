@@ -286,7 +286,6 @@ public class CameraPlugin implements MethodCallHandler {
             characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
         //noinspection ConstantConditions
         sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
-        Log.e("XXXXXXXX", "Sensor Orientation: " + sensorOrientation);
         //noinspection ConstantConditions
         isFrontFacing =
             characteristics.get(CameraCharacteristics.LENS_FACING)
@@ -409,29 +408,8 @@ public class CameraPlugin implements MethodCallHandler {
         mediaRecorder.release();
       }
       mediaRecorder = new MediaRecorder();
-      //mediaRecorder.setOrientationHint((isFrontFacing ? 180 : 0) % 360);
-      Log.e("XXXXXXXX", "=================");
-      try {
-        CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraName);
-        StreamConfigurationMap streamConfigurationMap =
-                characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-        //noinspection ConstantConditions
-        sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
-        Log.e("XXXXXXXX", "Updated Sensor Orientation: " + sensorOrientation);
-      } catch (Exception e) {
-        Log.e("XXXXXXXX", "Problem getting updated orientation");
-      }
-
-      //Log.e("XXXXXXXX", "Orientation hint" + 180 % 360);
-      //Log.e("XXXXXXXX", "Setting orientation hint: " + (isFrontFacing ? 180 : 0));
-      Log.e("XXXXXXXX", "Sensor Orientation: " + sensorOrientation);
       int rotation = activity.getWindowManager().getDefaultDisplay().getRotation();
-      Log.e("XXXXXXXX", "Rotation: " + rotation);
-      //Log.e("XXXXXXXX", "Orientation hint" + ((ORIENTATIONS.get(rotation) + sensorOrientation + 270) % 360));
-      Log.e("XXXXXXXX", "=> hint : " + (ORIENTATIONS.get(rotation) - sensorOrientation + (isFrontFacing ? 180 : 0)) % 360);
       mediaRecorder.setOrientationHint((ORIENTATIONS.get(rotation) - sensorOrientation + (isFrontFacing ? 180 : 0)) % 360);
-      //mediaRecorder.setOrientationHint(0);
-      Log.e("XXXXXXXX", "=================");
 
       mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
       mediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
@@ -443,42 +421,11 @@ public class CameraPlugin implements MethodCallHandler {
       mediaRecorder.setVideoFrameRate(27);
       mediaRecorder.setVideoSize(videoSize.getWidth(), videoSize.getHeight());
 
-
-
-      //Log.e("XXXXXXXX", "New correction " + getRotationCorrection());
       mediaRecorder.setOutputFile(outputFilePath);
-
-
-      //mediaRecorder.setOrientationHint((displayOrientation + sensorOrientation) % 360);
 
       mediaRecorder.prepare();
     }
 
-    //public int getRotationCorrection() {
-    //  int displayOrientation = ORIENTATIONS.get(activity.getWindowManager().getDefaultDisplay().getRotation());
-    //  Log.e("XXXXXXXX", "Display orientation " + displayOrientation);
-    //  int displayRotation = displayOrientation * 90;
-    //  if (isFrontFacing) {
-    //    int mirroredRotation = (sensorOrientation + displayRotation) % 360;
-    //    return (360 - mirroredRotation) % 360;
-    //  } else {
-    //    return (sensorOrientation - displayRotation + 360) % 360;
-    //  }
-    //}
-
-    //private int getDeviceDefaultOrientation() {
-    //  int rotation = activity.getWindowManager().getDefaultDisplay().getRotation();
-    //  Configuration config = activity.getResources().getConfiguration();
-    //  if( ( (rotation == Surface.ROTATION_0 || rotation == Surface.ROTATION_180) &&
-    //          config.orientation == Configuration.ORIENTATION_LANDSCAPE )
-    //          || ( (rotation == Surface.ROTATION_90 || rotation == Surface.ROTATION_270) &&
-    //          config.orientation == Configuration.ORIENTATION_PORTRAIT ) ) {
-    //    return Configuration.ORIENTATION_LANDSCAPE;
-    //  }
-    //  else {
-    //    return Configuration.ORIENTATION_PORTRAIT;
-    //  }
-    //}
 
     private void open(@Nullable final Result result) {
       if (!hasCameraPermission()) {
