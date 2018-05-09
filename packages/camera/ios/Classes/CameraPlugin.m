@@ -325,6 +325,9 @@
   } else {
     return NO;
   }
+  if (!_isAudioSetup) {
+    [self setUpCaptureSessionForAudio];
+  }
   _videoWriter =
       [[AVAssetWriter alloc] initWithURL:outputURL fileType:AVFileTypeMPEG4 error:&error];
   NSParameterAssert(_videoWriter);
