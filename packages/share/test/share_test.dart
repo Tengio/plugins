@@ -23,7 +23,7 @@ void main() {
 
   test('sharing null fails', () {
     expect(
-      () => Share.share(null),
+      () => Share.openShareDialog(null),
       throwsA(const isInstanceOf<AssertionError>()),
     );
     verifyZeroInteractions(mockChannel);
@@ -31,18 +31,18 @@ void main() {
 
   test('sharing empty fails', () {
     expect(
-      () => Share.share(''),
+      () => Share.openShareDialog(''),
       throwsA(const isInstanceOf<AssertionError>()),
     );
     verifyZeroInteractions(mockChannel);
   });
 
   test('sharing origin sets the right params', () async {
-    await Share.share(
+    await Share.openShareDialog(
       'some text to share',
       sharePositionOrigin: new Rect.fromLTWH(1.0, 2.0, 3.0, 4.0),
     );
-    verify(mockChannel.invokeMethod('share', <String, dynamic>{
+    verify(mockChannel.invokeMethod('openShareDialog', <String, dynamic>{
       'text': 'some text to share',
       'originX': 1.0,
       'originY': 2.0,
