@@ -15,6 +15,11 @@ class Share {
   static const MethodChannel channel =
       const MethodChannel('plugins.flutter.io/share');
 
+  static const String twitter = "twitter";
+  static const String telegram = "telegram";
+  static const String whatsApp = "whatsapp";
+  static const String email = "email";
+
   /// Summons the platform's share sheet to share text.
   ///
   /// Wraps the platform's native share dialog. Can share a text and/or a URL.
@@ -50,10 +55,10 @@ class Share {
   /// On IOS even if an app is installed it will not be available for sharing unless you add the corresponding URL Scheme to the list of LSApplicationQueriesSchemes in the Runner/Info.plist
   ///
   /// Possible results:
-  ///   - twitter
-  ///   - telegram
-  ///   - whatsapp
-  ///   - email
+  ///   - [twitter]
+  ///   - [telegram]
+  ///   - [whatsApp]
+  ///   - [email]
   static Future<List<String>> listKnownAvailableSharingApps() async {
     final List<dynamic> availableApps =
         await channel.invokeMethod('listKnownAvailableSharingApps');
